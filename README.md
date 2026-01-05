@@ -60,6 +60,14 @@ The script will:
 
 **Note**: If yfinance API is rate-limited, the script will automatically use realistic synthetic data to demonstrate functionality. The synthetic data uses geometric Brownian motion with parameters similar to real market data (annual return ~10%, volatility ~20%).
 
+## Development Notes
+
+For detailed information about challenges encountered during development and their solutions, see [DEVELOPMENT_NOTES.md](DEVELOPMENT_NOTES.md). This document covers:
+- API rate limiting and fallback mechanisms
+- VaR calculation methodology and design decisions
+- Kupiec test implementation details
+- Data alignment and visualization challenges
+
 ## Technical Details
 
 ### VaR Methods
