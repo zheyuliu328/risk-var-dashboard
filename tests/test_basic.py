@@ -5,6 +5,8 @@ import json
 import math
 from pathlib import Path
 import runpy
+import sys
+from types import SimpleNamespace
 import warnings
 
 import numpy as np
@@ -195,6 +197,56 @@ def test_csv_reader_does_not_fill_or_remove_internal_missing_returns(tmp_path):
     returns = main.get_data(path)
     assert len(returns) == 4
     np.testing.assert_allclose(returns.to_numpy(), [0.1, np.nan, np.nan, 0.1], equal_nan=True)
+
+
+@pytest.mark.parametrize("header", ["Date,Adj Close,Adj Close", "Date,Date,Adj Close"])
+def test_csv_duplicate_headers_are_rejected_before_pandas_renames_them(tmp_path, header):
+    path = tmp_path / "ambiguous.csv"
+    original = header + "\n2001-01-01,100,100\n2001-01-02,50,110\n2001-01-03,25,121\n"
+    path.write_text(original)
+    with pytest.raises(ValueError, match="headers must be unique"):
+        main.get_data(path)
+    assert path.read_text() == original
+
+
+@pytest.mark.parametrize("ticker", ["SPY QQQ", "SPY,QQQ", "", "SPY\tQQQ"])
+def test_downloader_rejects_multiple_or_empty_tickers_before_network(ticker, tmp_path, monkeypatch):
+    from download_data import main as download_main
+
+    def forbidden_download(*args, **kwargs):
+        raise AssertionError("Ambiguous symbols must be rejected before a request")
+
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=forbidden_download))
+    with pytest.raises(SystemExit) as exc:
+        download_main(["--ticker", ticker, "--output", str(tmp_path / "prices.csv")])
+    assert exc.value.code == 2
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("columns", [
+    [("Close", "QQQ")], [("Close", "SPY"), ("Close", "QQQ")],
+    [("Close", "SPY"), ("Close", "SPY")],
+])
+def test_downloader_rejects_wrong_or_ambiguous_returned_identity(columns, tmp_path, monkeypatch):
+    from download_data import main as download_main
+
+    data = pd.DataFrame(100., index=pd.date_range("2001-01-01", periods=3),
+                        columns=pd.MultiIndex.from_tuples(columns, names=["Price", "Ticker"]))
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=lambda *a, **kw: data))
+    with pytest.raises(ValueError, match="identity|ambiguous"):
+        download_main(["--ticker", "SPY", "--output", str(tmp_path / "prices.csv")])
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_single_ticker_download_roundtrips_without_selecting_another_asset(tmp_path, monkeypatch):
+    from download_data import main as download_main
+
+    data = pd.DataFrame([100., 110., 121.], index=pd.date_range("2001-01-01", periods=3),
+                        columns=pd.MultiIndex.from_tuples([("Close", "SPY")], names=["Price", "Ticker"]))
+    monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(download=lambda *a, **kw: data))
+    path = tmp_path / "prices.csv"
+    assert download_main(["--ticker", "SPY", "--output", str(path)]) == 0
+    np.testing.assert_allclose(main.get_data(path), [.1, .1])
 
 
 def test_downloader_import_does_not_import_network_client(monkeypatch):
