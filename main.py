@@ -1,6 +1,7 @@
 """One-observation-ahead VaR forecasts and unconditional-coverage diagnostics."""
 
 import argparse
+import csv
 import json
 from numbers import Integral, Real
 from pathlib import Path
@@ -46,7 +47,14 @@ def _series(values, name):
 
 def get_data(filepath="data/sp500_historical.csv"):
     """Read a local CSV only. Missing prices are not forward-filled."""
-    data = pd.read_csv(filepath, index_col="Date", parse_dates=True)
+    with open(filepath, encoding="utf-8-sig", newline="") as source:
+        header = next(csv.reader(source), [])
+        if len(header) != len(set(header)):
+            raise ValueError("CSV headers must be unique; duplicated price columns are ambiguous")
+        if "Date" not in header or "Adj Close" not in header:
+            raise ValueError("CSV must contain exactly one 'Date' and one 'Adj Close' column")
+        source.seek(0)
+        data = pd.read_csv(source, index_col="Date", parse_dates=True)
     if not isinstance(data.index, pd.DatetimeIndex):
         raise ValueError("CSV Date values must parse as dates")
     if "Adj Close" not in data:

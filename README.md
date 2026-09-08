@@ -7,12 +7,14 @@ The project demonstrates how forecast timing, missing observations and statistic
 ## Run offline
 
 ```bash
-python -m pip install -r requirements.txt 'pytest>=7.4'
+python -m pip install '.[test]'
 python -m pytest -v
-python main.py --source synthetic --seed 20260907 --observations 1500
+risk-var --source synthetic --seed 20260907 --observations 1500
 ```
 
 The last command prints JSON for both models and writes no files. The synthetic series uses a Student-t distribution with 5 degrees of freedom, a fixed seed, a 0.0002 location and 0.01 standard-deviation scale. Its business-day dates are artificial labels, not a historical trading calendar. A fixed seed makes the demonstration reproducible within the recorded environment; it does not guarantee a statistical test will reject or fail to reject.
+
+The installed `risk-var` command works outside the checkout; `python main.py` remains supported.
 
 To save a new report, forecast table and chart:
 
@@ -28,11 +30,11 @@ Generated results belong in the ignored `output/` directory. Existing output fil
 python main.py --source csv --csv-path data/sp500_historical.csv
 ```
 
-This reads an existing CSV with unique, increasing `Date` values and positive `Adj Close` prices. Returns are decimal simple returns. Missing prices are not filled, and internal missing-return rows remain in the time sequence.
+This reads an existing CSV with unique headers, unique increasing `Date` values and positive `Adj Close` prices. Duplicate price columns are rejected before parsing can silently rename them. Returns are decimal simple returns. Missing prices are not filled, and internal missing-return rows remain in the time sequence.
 
 The bundled CSV and `images/var_dashboard.png` are retained legacy assets. Their source vintage and the old chart's numerical claims have not been revalidated here. The old chart is not evidence for the corrected algorithm. The offline demo and tests do not download data or change either asset.
 
-`download_data.py` is a separate, optional network tool. Importing it is safe; explicitly running it requires `yfinance`, saves to `output/downloaded_prices.csv` by default, and refuses to overwrite an existing file. Neither the demo nor CI invokes it.
+`download_data.py` is a separate, optional network tool. Importing it is safe; explicitly running it requires `yfinance`, saves to `output/downloaded_prices.csv` by default, and refuses to overwrite an existing file. It accepts exactly one ticker and checks any returned ticker column level before choosing prices. Neither the demo nor CI makes a download request; tests use synthetic mocked responses.
 
 ## Forecast definition and timing correction
 
